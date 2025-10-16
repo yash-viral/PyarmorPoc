@@ -1,0 +1,20 @@
+pyarmor-subscription-fastapi/
+├─ README.md
+├─ requirements.txt
+├─ scripts/
+│ └─ generate_keys.py
+├─ app/
+│ ├─ __init__.py
+│ ├─ main.py
+│ ├─ config.py
+│ ├─ db.py
+│ ├─ models.py
+│ ├─ schemas.py
+│ ├─ controllers/
+│ │ └─ license_controller.py
+│ ├─ services/
+│ │ └─ license_service.py
+│ └─ utils/
+│ └─ crypto.py
+└─ client/
+└─ client.py
