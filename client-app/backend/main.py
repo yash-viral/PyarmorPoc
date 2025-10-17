@@ -45,17 +45,33 @@ async def validate_license(license_input: LicenseInput):
 async def upload_license_file(file: UploadFile = File(...)):
     global current_license
     try:
+        print(f"DEBUG: Received file upload: {file.filename}")
+        
         # Save uploaded license file
         license_path = Path("license.lic")
         with open(license_path, "wb") as f:
             content = await file.read()
             f.write(content)
         
+        print(f"DEBUG: Saved license file to {license_path}")
+        print(f"DEBUG: File size: {license_path.stat().st_size} bytes")
+        
+        # Show first few lines of the file
+        with open(license_path, "r") as f:
+            first_lines = f.read(200)
+            print(f"DEBUG: File content preview: {first_lines}...")
+        
         # Validate the license file
+        print("DEBUG: Starting license validation...")
         result = license_validator.validate_license_file(str(license_path))
+        print(f"DEBUG: License validation successful: {result}")
+        
         current_license = result
         return {"status": "success", "license": result}
     except Exception as e:
+        print(f"DEBUG: License validation failed: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.post("/validate-license-file")
@@ -78,6 +94,13 @@ async def get_license_status():
 async def chat_with_agent(chat: ChatMessage):
     if not current_license:
         raise HTTPException(status_code=400, detail="No valid license")
+    
+    # Enforce server verification for critical operations
+    if not current_license.get("server_verified", False):
+        raise HTTPException(
+            status_code=403, 
+            detail="License not verified with server. Please check your internet connection and try again."
+        )
     
     # Check if license is expired
     from datetime import datetime, timezone

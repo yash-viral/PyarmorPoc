@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app import schemas, models
 from app.services import license_service
+from app.utils.crypto import encrypt_license_data
 import json
 import subprocess
 from pathlib import Path
@@ -58,7 +59,9 @@ def download_license(license_key: str, db: Session = Depends(get_db)):
             # Get license data from database
             lic = db.query(models.License).filter(models.License.license_key == license_key).first()
             if lic:
-                license_content = f"# PyArmor License\n# Key: {license_key}\n# Data: {json.dumps(lic.license_data)}\n# Expires: {lic.expires_at}"
+                # Encrypt the license data
+                encrypted_data = encrypt_license_data(lic.license_data)
+                license_content = f"# PyArmor License\n# Key: {license_key}\n# EncryptedData: {encrypted_data}\n# Expires: {lic.expires_at}"
             else:
                 license_content = f"# PyArmor License\n# Key: {license_key}\n# Fallback license file"
             
@@ -80,9 +83,29 @@ def verify_license(license_key: str, db: Session = Depends(get_db)):
     if not license_data:
         raise HTTPException(status_code=404, detail="License not found")
     
+    # Get full license data from database for encryption
+    lic = db.query(models.License).filter(models.License.license_key == license_key).first()
+    if lic:
+        # Encrypt the license data for preview
+        encrypted_preview = encrypt_license_data(lic.license_data)
+        preview_data = {
+            "encrypted_data": encrypted_preview,
+            "plan": license_data["plan_name"],
+            "agents": license_data["agents"],
+            "expires_at": license_data["expires_at"],
+            "is_active": license_data["is_active"]
+        }
+    else:
+        preview_data = license_data
+    
     return {
         "message": "License found", 
         "license_key": license_key,
         "download_url": f"/api/licenses/download/{license_key}",
-        "license_data": license_data
+        "license_data": {
+            "plan_name": license_data["plan_name"],
+            "agents": license_data["agents"],
+            "expires_at": license_data["expires_at"],
+            "is_active": license_data["is_active"]
+        }
     }

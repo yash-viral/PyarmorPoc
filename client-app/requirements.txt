@@ -1,5 +1,5 @@
 fastapi
-uvicorn[standard]
-pydantic
+uvicorn
+python-multipart
 cryptography
-pyarmor
+requests

@@ -1,0 +1,9 @@
+{
+  "plan": "starter",
+  "agents": [
+    "agent1",
+    "agent2"
+  ],
+  "rate_limit_per_min": 2,
+  "expires_at": "2025-11-16T11:51:35.219744"
+}

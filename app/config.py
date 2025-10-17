@@ -60,7 +60,7 @@ ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*").split(",")
 # Print summary (optional)
 # ---------------------------------------------------------
 if DEBUG_MODE:
-    print("⚙️  Loaded Configuration:")
+    print("Loaded Configuration:")
     print(f"  BASE_DIR:          {BASE_DIR}")
     print(f"  DATABASE_URL:      {DATABASE_URL}")
     print(f"  PRIVATE_KEY_PATH:  {PRIVATE_KEY_PATH}")
