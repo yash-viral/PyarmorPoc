@@ -17,7 +17,7 @@ def run_protected_client():
     print("🚀 Starting PyArmor-protected client backend...")
     
     # Run the protected main.py without reload (PyArmor doesn't support reload)
-    cmd = [sys.executable, "-m", "uvicorn", "main:app", "--host", "127.0.0.1", "--port", "8001"]
+    cmd = [sys.executable, "-m", "uvicorn", "backend.main:app", "--host", "127.0.0.1", "--port", "8001"]
     
     try:
         subprocess.run(cmd, cwd=dist_dir)
