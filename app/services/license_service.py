@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from sqlalchemy.orm import Session
 from app import models, schemas
-from app.utils.crypto import sign_license_data
+from app.utils.crypto import sign_license_data, encrypt_license_data
 from app.config import DEFAULT_LICENSE_DURATION_DAYS
 
 
@@ -76,35 +76,44 @@ def create_pyarmor_license(db: Session, request: schemas.LicenseCreate) -> schem
         expiry_date = expires_at.strftime("%Y-%m-%d %H:%M:%S")
     else:
         expiry_date = expires_at.strftime("%Y-%m-%d")
-    data_json = json.dumps(license_data)
     print(f"DEBUG: PyArmor expiry_date: {expiry_date}")
     
+    # Always encrypt license data with RSA
+    encrypted_data = encrypt_license_data(license_data)
+    print(f"DEBUG: Encrypted license data: {encrypted_data[:100]}...")
+    
     try:
-        # Generate PyArmor license file
+        # Generate PyArmor license file with encrypted data
         cmd = [
             "pyarmor", "licenses",
             "--expired", expiry_date,
-            "--data", data_json,
+            "--data", encrypted_data,
             license_key
         ]
         
         result = subprocess.run(cmd, capture_output=True, text=True, cwd=Path.cwd())
         
         if result.returncode != 0:
-            # Fallback: create directory structure manually
+            print(f"DEBUG: PyArmor command failed: {result.stderr}")
+            print(f"DEBUG: PyArmor stdout: {result.stdout}")
+            # Fallback: create directory structure manually with encrypted data
             license_dir = Path(f"licenses/{license_key}")
             license_dir.mkdir(parents=True, exist_ok=True)
             
-            # Create a dummy license file for testing
             license_file = license_dir / "license.lic"
-            license_file.write_text(f"# PyArmor License\n# Data: {data_json}\n# Expires: {expiry_date}")
+            license_file.write_text(f"# PyArmor License\n# Key: {license_key}\n# EncryptedData: {encrypted_data}\n# Expires: {expiry_date}")
+            print(f"DEBUG: Created fallback encrypted license file")
+        else:
+            print(f"DEBUG: PyArmor license created successfully")
             
     except Exception as e:
-        # Fallback for development
+        print(f"DEBUG: Exception during license creation: {e}")
+        # Fallback for development with encryption
         license_dir = Path(f"licenses/{license_key}")
         license_dir.mkdir(parents=True, exist_ok=True)
         license_file = license_dir / "license.lic"
-        license_file.write_text(f"# PyArmor License\n# Data: {data_json}\n# Expires: {expiry_date}")
+        license_file.write_text(f"# PyArmor License\n# Key: {license_key}\n# EncryptedData: {encrypted_data}\n# Expires: {expiry_date}")
+        print(f"DEBUG: Created exception fallback encrypted license file")
     
     # Create license record
     license_record = models.License(
@@ -125,9 +134,17 @@ def create_pyarmor_license(db: Session, request: schemas.LicenseCreate) -> schem
         db.add(models.Agent(license_id=license_record.id, agent_name=agent_name))
     db.commit()
 
+    # Create response with encrypted data for preview
+    encrypted_preview = encrypt_license_data(license_data)
+    
     return schemas.LicenseIssuedResponse(
         license_key=license_key,
-        license_data=license_data,
+        license_data={
+            "encrypted_data": encrypted_preview,
+            "plan": license_data["plan"],
+            "agents": license_data["agents"],
+            "expires_at": license_data["expires_at"]
+        },
         expires_at=expires_at,
         plan_name=plan_info["name"],
         user_email=user.email
@@ -146,12 +163,15 @@ def get_license_info(db: Session, license_key: str) -> dict:
     if not lic:
         return None
     
+    print(f"DEBUG: License data from DB: {lic.license_data}")
+    print(f"DEBUG: License data type: {type(lic.license_data)}")
+    
     return {
         "license_key": license_key,
         "plan_name": lic.license_data.get("plan"),
         "agents": lic.license_data.get("agents", []),
         "expires_at": lic.expires_at.isoformat(),
-        "is_active": lic.is_active and lic.expires_at > datetime.now(timezone.utc)
+        "is_active": lic.is_active and lic.expires_at.replace(tzinfo=timezone.utc) > datetime.now(timezone.utc)
     }
 
 def verify_license(db: Session, license_key: str) -> bool:
@@ -161,6 +181,6 @@ def verify_license(db: Session, license_key: str) -> bool:
     lic = db.query(models.License).filter(models.License.license_key == license_key).first()
     if not lic:
         return False
-    if not lic.is_active or lic.expires_at < datetime.now(timezone.utc):
+    if not lic.is_active or lic.expires_at.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):
         return False
     return True
