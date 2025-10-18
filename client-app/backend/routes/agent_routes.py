@@ -16,11 +16,15 @@ async def chat_with_agent(chat: ChatMessage):
 
 @router.get("/available-agents")
 async def get_available_agents():
-    from services.license_service import LicenseService
-    license_service = LicenseService()
-    current_license = license_service.get_current_license()
-    if not current_license:
+    try:
+        from services.license_service import LicenseService
+        license_service = LicenseService()
+        current_license = license_service.get_current_license()
+        if not current_license:
+            return {"agents": []}
+        
+        agents = agent_service.get_available_agents(current_license["agents"])
+        return {"agents": agents}
+    except Exception as e:
+        print(f"DEBUG: Error getting available agents: {e}")
         return {"agents": []}
-    
-    agents = agent_service.get_available_agents(current_license["agents"])
-    return {"agents": agents}

@@ -11,15 +11,21 @@ class LicenseMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.license_service = license_service
         self.agent_timestamps = defaultdict(list)
-        self.protected_paths = ["/chat", "/available-agents"]
+        self.protected_paths = ["/chat"]
     
     async def dispatch(self, request: Request, call_next):
+        # Skip middleware for OPTIONS requests (CORS preflight)
+        if request.method == "OPTIONS":
+            return await call_next(request)
+            
         if not any(request.url.path.startswith(path) for path in self.protected_paths):
             return await call_next(request)
         
         try:
             current_license = self.license_service.get_current_license()
+            print(f"DEBUG: Middleware - current license: {current_license}")
             if not current_license:
+                print("DEBUG: Middleware - No valid license found")
                 return JSONResponse(status_code=400, content={"detail": "No valid license"})
             
             if not current_license.get("server_verified", False):
