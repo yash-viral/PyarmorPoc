@@ -8,7 +8,7 @@ and sets up middleware, CORS, and startup events.
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.controllers import license_controller
+from app.routers import license_router
 from app.db import init_db
 import subprocess
 from pathlib import Path
@@ -36,7 +36,7 @@ app.add_middleware(
 # ---------------------------------------------------------
 # Routers
 # ---------------------------------------------------------
-app.include_router(license_controller.router, prefix="/api/licenses", tags=["Licenses"])
+app.include_router(license_router.router, prefix="/api/licenses", tags=["Licenses"])
 
 # ---------------------------------------------------------
 # Startup / Shutdown Events

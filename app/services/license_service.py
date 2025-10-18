@@ -10,12 +10,13 @@ import subprocess
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from sqlalchemy.orm import Session
-from app import models, schemas
+from app.models import User, License, Agent
+from app.schemas import LicenseCreate, LicenseIssuedResponse
 from app.utils.crypto import sign_license_data, encrypt_license_data
 from app.config import DEFAULT_LICENSE_DURATION_DAYS
 
 
-def create_pyarmor_license(db: Session, request: schemas.LicenseCreate) -> schemas.LicenseIssuedResponse:
+def create_pyarmor_license(db: Session, request: LicenseCreate) -> LicenseIssuedResponse:
     # Plan definitions
     PLANS = {
         1: {"name": "starter", "rate_limit_per_min": 2, "max_agents": 2},
@@ -34,9 +35,9 @@ def create_pyarmor_license(db: Session, request: schemas.LicenseCreate) -> schem
         raise ValueError(f"Too many agents for {plan_info['name']} plan (max {plan_info['max_agents']})")
     
     # Create user if not exists
-    user = db.query(models.User).filter(models.User.id == request.user_id).first()
+    user = db.query(User).filter(User.id == request.user_id).first()
     if not user:
-        user = models.User(id=request.user_id, email=f"user{request.user_id}@example.com", name=f"User {request.user_id}")
+        user = User(id=request.user_id, email=f"user{request.user_id}@example.com", name=f"User {request.user_id}")
         db.add(user)
         db.commit()
 
@@ -116,7 +117,7 @@ def create_pyarmor_license(db: Session, request: schemas.LicenseCreate) -> schem
         print(f"DEBUG: Created exception fallback encrypted license file")
     
     # Create license record
-    license_record = models.License(
+    license_record = License(
         user_id=user.id,
         plan_id=request.plan_id,
         license_key=license_key,
@@ -131,13 +132,13 @@ def create_pyarmor_license(db: Session, request: schemas.LicenseCreate) -> schem
 
     # Create agent records
     for agent_name in request.agents:
-        db.add(models.Agent(license_id=license_record.id, agent_name=agent_name))
+        db.add(Agent(license_id=license_record.id, agent_name=agent_name))
     db.commit()
 
     # Create response with encrypted data for preview
     encrypted_preview = encrypt_license_data(license_data)
     
-    return schemas.LicenseIssuedResponse(
+    return LicenseIssuedResponse(
         license_key=license_key,
         license_data={
             "encrypted_data": encrypted_preview,
@@ -151,7 +152,7 @@ def create_pyarmor_license(db: Session, request: schemas.LicenseCreate) -> schem
     )
 
 
-def create_license(db: Session, request: schemas.LicenseCreate) -> schemas.LicenseIssuedResponse:
+def create_license(db: Session, request: LicenseCreate) -> LicenseIssuedResponse:
     """Backward compatibility wrapper"""
     return create_pyarmor_license(db, request)
 
@@ -159,7 +160,7 @@ def get_license_info(db: Session, license_key: str) -> dict:
     """
     Get license information including download details.
     """
-    lic = db.query(models.License).filter(models.License.license_key == license_key).first()
+    lic = db.query(License).filter(License.license_key == license_key).first()
     if not lic:
         return None
     
@@ -178,7 +179,7 @@ def verify_license(db: Session, license_key: str) -> bool:
     """
     Verify if a license exists, is active, and not expired.
     """
-    lic = db.query(models.License).filter(models.License.license_key == license_key).first()
+    lic = db.query(License).filter(License.license_key == license_key).first()
     if not lic:
         return False
     if not lic.is_active or lic.expires_at.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):

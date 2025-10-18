@@ -9,7 +9,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from app.db import get_db
-from app import schemas, models
+from app.models import License
+from app.schemas import LicenseCreate, LicenseIssuedResponse
 from app.services import license_service
 from app.utils.crypto import encrypt_license_data
 import json
@@ -23,8 +24,8 @@ import uuid
 router = APIRouter(tags=["Licenses"])
 
 
-@router.post("/", response_model=schemas.LicenseIssuedResponse)
-def issue_license(request: schemas.LicenseCreate, db: Session = Depends(get_db)):
+@router.post("/", response_model=LicenseIssuedResponse)
+def issue_license(request: LicenseCreate, db: Session = Depends(get_db)):
     try:
         # Generate PyArmor license with embedded plan data
         license_issued = license_service.create_pyarmor_license(db, request)
@@ -57,7 +58,7 @@ def download_license(license_key: str, db: Session = Depends(get_db)):
             license_file = license_dir / "license.lic"
             
             # Get license data from database
-            lic = db.query(models.License).filter(models.License.license_key == license_key).first()
+            lic = db.query(License).filter(License.license_key == license_key).first()
             if lic:
                 # Encrypt the license data
                 encrypted_data = encrypt_license_data(lic.license_data)
@@ -84,7 +85,7 @@ def verify_license(license_key: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="License not found")
     
     # Get full license data from database for encryption
-    lic = db.query(models.License).filter(models.License.license_key == license_key).first()
+    lic = db.query(License).filter(License.license_key == license_key).first()
     if lic:
         # Encrypt the license data for preview
         encrypted_preview = encrypt_license_data(lic.license_data)

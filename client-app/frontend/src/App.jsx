@@ -22,7 +22,7 @@ export default function App() {
       const formData = new FormData()
       formData.append('file', licenseFile)
       
-      const response = await fetch(`${API_BASE}/upload-license`, {
+      const response = await fetch(`${API_BASE}/api/license/upload`, {
         method: 'POST',
         body: formData
       })
@@ -43,7 +43,7 @@ export default function App() {
   
   const checkExistingLicense = async () => {
     try {
-      const response = await fetch(`${API_BASE}/validate-license-file`, {
+      const response = await fetch(`${API_BASE}/api/license/validate-file`, {
         method: 'POST'
       })
       
